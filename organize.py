@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 # todo:
 # - dry run
 # - toggle hidden files
