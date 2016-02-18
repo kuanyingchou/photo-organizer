@@ -2,6 +2,8 @@
 # - dry run
 # - toggle hidden files
 # - toggle verbose
+# - file creation date might not be way off
+# - options
 
 import os
 import os.path as p
@@ -12,6 +14,7 @@ import exifread
 
 mkdir_count = 0
 mv_count = 0
+skip_count = 0
 
 
 def get_date_from_epoch(epoch):
@@ -24,10 +27,15 @@ def get_date_created(path):
 def get_date_taken(path):
     f = open(path, 'rb')
     tags = exifread.process_file(f)
-    key = "EXIF DateTimeOriginal"
-    if key in tags:
-        ts = tags[key] 
-    else:
+    keys = ["EXIF DateTimeOriginal", "Image DateTime", "EXIF DateTimeDigitized"]
+    ts = None
+    for key in keys:
+        if key in tags:
+            ts = tags[key] 
+            break
+    if ts is None:
+        # print(path, tags)
+        # exit()
         return None
 
     #[ ref: http://code.activestate.com/recipes/550811-jpg-files-redater-by-exif-data/
@@ -38,14 +46,15 @@ def get_date_taken(path):
 
 def get_date(path):
     date = get_date_taken(path)
-    if date is None:
-        date = get_date_created(path)
-        print("warning: couldn't find date exif data in '%s'. using file creation date instead" % path)
+    # if date is None:
+    #     date = get_date_created(path)
+    #     print("warning: couldn't find date exif data in '%s'. using file creation date instead" % path)
     return date
 
-def mv_file_under_date(filepath, dest_dir):
+def mv_file_under_date(filepath, dest_dir, dry):
     global mkdir_count
     global mv_count
+    global skip_count
 
     if not p.exists(dest_dir):
         exit("error: directory '%s' does not exist!" % dest_dir)
@@ -53,6 +62,11 @@ def mv_file_under_date(filepath, dest_dir):
         exit("error: file '%s' does not exist!" % filepath)
 
     date = get_date(filepath)
+    if date is None:
+        print("warning: couldn't find date exif data in '%s'. skipping..." % filepath)
+        skip_count += 1
+        return # todo
+
     dest_year_path = p.join(dest_dir, str(date.year))
     if not p.exists(dest_year_path):
         print("mkdir '%s'" % dest_year_path)
@@ -62,19 +76,21 @@ def mv_file_under_date(filepath, dest_dir):
     dest_date_path = p.join(dest_year_path, date.isoformat())
     filename = p.basename(filepath)
     if not p.exists(dest_date_path):
-        print("mkdir '%s'" % dest_date_path)
-        os.mkdir(dest_date_path)
+        # print("mkdir '%s'" % dest_date_path)
+        if not dry:
+            os.mkdir(dest_date_path)
         mkdir_count += 1
 
     dest_file_path = p.join(dest_date_path, filename)
     if(p.exists(dest_file_path)):
         print("file '%s' already exists. skipping..." % dest_file_path) # todo: override?
     else:
-        print("mv '%s' to '%s'" % (filepath, dest_file_path))
-        os.rename(filepath, dest_file_path);
+        # print("mv '%s' to '%s'" % (filepath, dest_file_path))
+        if not dry:
+            os.rename(filepath, dest_file_path)
         mv_count += 1
 
-def mv_under_date(path, dest_dir):
+def mv_under_date(path, dest_dir, dry):
     if not p.exists(dest_dir):
         exit("error: directory '%s' does not exist!" % dest_dir)
     if not p.exists(path):
@@ -82,12 +98,12 @@ def mv_under_date(path, dest_dir):
 
     if p.isfile(path):
         if not p.basename(path).startswith("."):
-            mv_file_under_date(path, dest_dir)
+            mv_file_under_date(path, dest_dir, dry)
     elif p.isdir(path):
         if not path == dest_dir:
             children = os.listdir(path)
             for c in children:
-                mv_under_date(p.join(path, c), dest_dir)
+                mv_under_date(p.join(path, c), dest_dir, dry)
     else:
         # todo: links?
         pass
@@ -109,9 +125,11 @@ if __name__ == '__main__':
 
     print("moving files from %s to '%s'..." % (src_str, destination))
 
+    dry = True
     for s in sources:
-        mv_under_date(s, destination)
+        mv_under_date(s, destination, dry)
     print("%s file(s) moved" % mv_count)
     print("%s dir(s) created" % mkdir_count)
+    print("%s file(s) skipped" % skip_count)
     print("done!")
 
