@@ -17,6 +17,10 @@ mkdir_count = 0
 mv_count = 0
 skip_count = 0
 
+keys = ["EXIF:DateTimeOriginal", "ICC_Profile:ProfileDateTime", "File:FileModifyDate"]
+backlog = []
+backlog_size = 20
+
 def get_date_from_epoch(epoch):
     dt = datetime.datetime.strptime(time.ctime(epoch) , "%a %b %d %H:%M:%S %Y")
     return dt.date()
@@ -24,36 +28,29 @@ def get_date_from_epoch(epoch):
 def get_date_created(path):
     return get_date_from_epoch(p.getctime(path))
 
-def get_date_taken(path):
+def get_date_from_metadata(m):
+    global keys
+    for k in keys:
+        if k in m:
+            mt = m[k]
+            try:
+                ts = time.strptime(str(mt)[:10], '%Y:%m:%d')
+                t = time.mktime(ts)
+                return get_date_from_epoch(t)
+            finally:
+                pass
+    return None
+
+def get_path_dates(paths):
     ts = None
     with exiftool.ExifTool() as et:
-        metadata = et.get_metadata(path)
+        ms = et.get_metadata_batch(paths)
         # print metadata
-        keys = ["EXIF:DateTimeOriginal", "ICC_Profile:ProfileDateTime", "File:FileModifyDate"]
-        for k in keys:
-            if k in metadata:
-                ts = metadata[k]
-                break;
+        dates = [ get_date_from_metadata(m) for m in ms ]
+        # print("%s - %s" % (len(ms), len(dates)))
+        return zip(paths, dates)
 
-    if ts is None:
-        # print(path, tags)
-        # exit()
-        return None
-
-    #[ ref: http://code.activestate.com/recipes/550811-jpg-files-redater-by-exif-data/
-    ts = time.strptime(str(ts)[:10], '%Y:%m:%d')
-    t = time.mktime(ts)
-
-    return get_date_from_epoch(t)
-
-def get_date(path):
-    date = get_date_taken(path)
-    # if date is None:
-    #     date = get_date_created(path)
-    #     print("warning: couldn't find date exif data in '%s'. using file creation date instead" % path)
-    return date
-
-def mv_file_under_date(filepath, dest_dir, dry):
+def mv(filepath, date, dest_dir, dry):
     global mkdir_count
     global mv_count
     global skip_count
@@ -63,7 +60,6 @@ def mv_file_under_date(filepath, dest_dir, dry):
     if not p.exists(filepath):
         exit("error: file '%s' does not exist!" % filepath)
 
-    date = get_date(filepath)
     if date is None:
         print("warning: couldn't find date exif data in '%s'. skipping..." % filepath)
         skip_count += 1
@@ -91,6 +87,21 @@ def mv_file_under_date(filepath, dest_dir, dry):
         if not dry:
             os.rename(filepath, dest_file_path)
         mv_count += 1
+
+def process_backlog(dest_dir, dry):
+    global backlog
+    pds = get_path_dates(backlog)
+    for pd in pds:
+        mv(pd[0], pd[1], dest_dir, dry)
+    del backlog[:] 
+
+def mv_file_under_date(filepath, dest_dir, dry):
+    global backlog
+    global backlog_size
+    # print(filepath+" !!!")
+    backlog.append(filepath)
+    if len(backlog) == backlog_size:
+        process_backlog(dest_dir, dry)
 
 def mv_under_date(path, dest_dir, dry):
     if not p.exists(dest_dir):
@@ -123,13 +134,14 @@ if __name__ == '__main__':
         src_str = ", ".join(["'" + s + "'" for s in sources[:-1]]) + " and " + sources[-1]
     else:
         src_str = "'"+sources[0]+"'"
-
-
     print("moving files from %s to '%s'..." % (src_str, destination))
 
-    dry = False
+    dry = False # dry run
     for s in sources:
         mv_under_date(s, destination, dry)
+    if len(backlog) > 0:
+        process_backlog(destination, dry)
+
     print("%s file(s) moved" % mv_count)
     print("%s dir(s) created" % mkdir_count)
     print("%s file(s) skipped" % skip_count)
