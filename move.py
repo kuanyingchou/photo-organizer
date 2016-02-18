@@ -16,7 +16,7 @@ mv_count = 0
 
 def get_date_from_epoch(epoch):
     dt = datetime.datetime.strptime(time.ctime(epoch) , "%a %b %d %H:%M:%S %Y")
-    return dt.date().isoformat()
+    return dt.date()
 
 def get_date_created(path):
     return get_date_from_epoch(p.getctime(path))
@@ -53,14 +53,20 @@ def mv_file_under_date(filepath, dest_dir):
         exit("error: file '%s' does not exist!" % filepath)
 
     date = get_date(filepath)
-    dest_subdir_path = p.join(dest_dir, date)
-    filename = p.basename(filepath)
-    if not p.exists(dest_subdir_path):
-        print("mkdir '%s'" % dest_subdir_path)
-        os.mkdir(dest_subdir_path)
+    dest_year_path = p.join(dest_dir, str(date.year))
+    if not p.exists(dest_year_path):
+        print("mkdir '%s'" % dest_year_path)
+        os.mkdir(dest_year_path)
         mkdir_count += 1
 
-    dest_file_path = p.join(dest_subdir_path, filename)
+    dest_date_path = p.join(dest_year_path, date.isoformat())
+    filename = p.basename(filepath)
+    if not p.exists(dest_date_path):
+        print("mkdir '%s'" % dest_date_path)
+        os.mkdir(dest_date_path)
+        mkdir_count += 1
+
+    dest_file_path = p.join(dest_date_path, filename)
     if(p.exists(dest_file_path)):
         print("file '%s' already exists. skipping..." % dest_file_path) # todo: override?
     else:
