@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python
 
 # todo:
 # - dry run
@@ -7,6 +7,7 @@
 # - file creation date might not be way off
 # - options
 # - global var/constants is a pain
+# - generate log file about skipped files
 
 import os
 import os.path as p

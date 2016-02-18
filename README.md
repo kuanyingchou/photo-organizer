@@ -33,3 +33,4 @@ other tools:
   mdls
   exiftool
 
+  find d -name '*.JPG' -exec mv {} s/ \;
