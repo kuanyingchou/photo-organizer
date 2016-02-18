@@ -8,6 +8,8 @@
 # - options
 # - global var/constants is a pain
 # - generate log file about skipped files
+# - goggle cp/mv
+# - same file detection: rename, skip, or override
 
 import os
 import os.path as p
