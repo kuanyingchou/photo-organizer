@@ -24,7 +24,11 @@ def get_date_created(path):
 def get_date_taken(path):
     f = open(path, 'rb')
     tags = exifread.process_file(f)
-    ts = tags["EXIF DateTimeOriginal"] 
+    key = "EXIF DateTimeOriginal"
+    if key in tags:
+        ts = tags[key] 
+    else:
+        return None
 
     #[ ref: http://code.activestate.com/recipes/550811-jpg-files-redater-by-exif-data/
     ts = time.strptime(str(ts) + 'UTC', '%Y:%m:%d %H:%M:%S%Z')
@@ -36,7 +40,7 @@ def get_date(path):
     date = get_date_taken(path)
     if date is None:
         date = get_date_created(path)
-        print("couldn't find date exif data in '%s'" % path)
+        print("warning: couldn't find date exif data in '%s'. using file creation date instead" % path)
     return date
 
 def mv_file_under_date(filepath, dest_dir):
@@ -52,15 +56,15 @@ def mv_file_under_date(filepath, dest_dir):
     dest_subdir_path = p.join(dest_dir, date)
     filename = p.basename(filepath)
     if not p.exists(dest_subdir_path):
-        print("mkdir %s" % dest_subdir_path)
+        print("mkdir '%s'" % dest_subdir_path)
         os.mkdir(dest_subdir_path)
         mkdir_count += 1
 
     dest_file_path = p.join(dest_subdir_path, filename)
     if(p.exists(dest_file_path)):
-        print("file %s already exists. skipping..." % dest_file_path) # todo: override?
+        print("file '%s' already exists. skipping..." % dest_file_path) # todo: override?
     else:
-        print("mv %s to %s" % (filepath, dest_file_path))
+        print("mv '%s' to '%s'" % (filepath, dest_file_path))
         os.rename(filepath, dest_file_path);
         mv_count += 1
 
