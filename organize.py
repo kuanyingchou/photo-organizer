@@ -15,6 +15,7 @@ import sys
 import time
 import datetime
 import exiftool
+import shutil
 
 mkdir_count = 0
 mv_count = 0
@@ -88,7 +89,10 @@ def mv(filepath, date, dest_dir, dry):
     else:
         print("mv '%s' to '%s'" % (filepath, dest_file_path))
         if not dry:
-            os.rename(filepath, dest_file_path)
+            #[ would cause `OSError: [Errno 18] Cross-device link` when importing from sd card
+            # os.rename(filepath, dest_file_path) 
+
+            shutil.move(filepath, dest_file_path)
         mv_count += 1
 
 def process_backlog(dest_dir, dry):
