@@ -4,18 +4,22 @@
 # - toggle verbose
 # - file creation date might not be way off
 # - options
+# - global var/constants is a pain
 
 import os
 import os.path as p
 import sys
 import time
 import datetime
-import exifread
+from PIL import Image
 
 mkdir_count = 0
 mv_count = 0
 skip_count = 0
 
+DATE_TIME_ORIGINAL = 0x0132 
+DATE_TIME_DIGITIZED = 0x9003  
+DATE_TIME = 0x9004
 
 def get_date_from_epoch(epoch):
     dt = datetime.datetime.strptime(time.ctime(epoch) , "%a %b %d %H:%M:%S %Y")
@@ -25,13 +29,20 @@ def get_date_created(path):
     return get_date_from_epoch(p.getctime(path))
 
 def get_date_taken(path):
-    f = open(path, 'rb')
-    tags = exifread.process_file(f)
-    keys = ["EXIF DateTimeOriginal", "Image DateTime", "EXIF DateTimeDigitized"]
+    global DATE_TIME_ORIGINAL 
+    global DATE_TIME_DIGITIZED
+    global DATE_TIME 
+
+    f = Image.open(path)
+    exif = f._getexif()
+    # http://www.media.mit.edu/pia/Research/deepview/exif.html
+
+    keys = [DATE_TIME_ORIGINAL, DATE_TIME_DIGITIZED, DATE_TIME]  
+
     ts = None
     for key in keys:
-        if key in tags:
-            ts = tags[key] 
+        if key in exif:
+            ts = exif[key] 
             break
     if ts is None:
         # print(path, tags)
