@@ -11,15 +11,11 @@ import os.path as p
 import sys
 import time
 import datetime
-from PIL import Image
+import exiftool
 
 mkdir_count = 0
 mv_count = 0
 skip_count = 0
-
-DATE_TIME_ORIGINAL = 0x0132 
-DATE_TIME_DIGITIZED = 0x9003  
-DATE_TIME = 0x9004
 
 def get_date_from_epoch(epoch):
     dt = datetime.datetime.strptime(time.ctime(epoch) , "%a %b %d %H:%M:%S %Y")
@@ -29,28 +25,23 @@ def get_date_created(path):
     return get_date_from_epoch(p.getctime(path))
 
 def get_date_taken(path):
-    global DATE_TIME_ORIGINAL 
-    global DATE_TIME_DIGITIZED
-    global DATE_TIME 
-
-    f = Image.open(path)
-    exif = f._getexif()
-    # http://www.media.mit.edu/pia/Research/deepview/exif.html
-
-    keys = [DATE_TIME_ORIGINAL, DATE_TIME_DIGITIZED, DATE_TIME]  
-
     ts = None
-    for key in keys:
-        if key in exif:
-            ts = exif[key] 
-            break
+    with exiftool.ExifTool() as et:
+        metadata = et.get_metadata(path)
+        # print metadata
+        keys = ["EXIF:DateTimeOriginal", "ICC_Profile:ProfileDateTime", "File:FileModifyDate"]
+        for k in keys:
+            if k in metadata:
+                ts = metadata[k]
+                break;
+
     if ts is None:
         # print(path, tags)
         # exit()
         return None
 
     #[ ref: http://code.activestate.com/recipes/550811-jpg-files-redater-by-exif-data/
-    ts = time.strptime(str(ts) + 'UTC', '%Y:%m:%d %H:%M:%S%Z')
+    ts = time.strptime(str(ts)[:10], '%Y:%m:%d')
     t = time.mktime(ts)
 
     return get_date_from_epoch(t)
@@ -87,7 +78,7 @@ def mv_file_under_date(filepath, dest_dir, dry):
     dest_date_path = p.join(dest_year_path, date.isoformat())
     filename = p.basename(filepath)
     if not p.exists(dest_date_path):
-        # print("mkdir '%s'" % dest_date_path)
+        print("mkdir '%s'" % dest_date_path)
         if not dry:
             os.mkdir(dest_date_path)
         mkdir_count += 1
@@ -96,7 +87,7 @@ def mv_file_under_date(filepath, dest_dir, dry):
     if(p.exists(dest_file_path)):
         print("file '%s' already exists. skipping..." % dest_file_path) # todo: override?
     else:
-        # print("mv '%s' to '%s'" % (filepath, dest_file_path))
+        print("mv '%s' to '%s'" % (filepath, dest_file_path))
         if not dry:
             os.rename(filepath, dest_file_path)
         mv_count += 1
@@ -136,7 +127,7 @@ if __name__ == '__main__':
 
     print("moving files from %s to '%s'..." % (src_str, destination))
 
-    dry = True
+    dry = False
     for s in sources:
         mv_under_date(s, destination, dry)
     print("%s file(s) moved" % mv_count)
